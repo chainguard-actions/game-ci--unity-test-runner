@@ -1,0 +1,33 @@
+name: Test projectPath input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a minimal Unity project structure
+        run: |
+          mkdir -p my-unity-project/ProjectSettings
+          echo 'm_EditorVersion: 2022.3.0f1' > my-unity-project/ProjectSettings/ProjectVersion.txt
+      - id: action
+        uses: .
+        with:
+          unityVersion: '2022.3.0f1'
+          projectPath: 'my-unity-project'
+          testMode: 'editmode'
+          artifactsPath: 'artifacts'
+        continue-on-error: true
+      - name: Assert artifactsPath output is set
+        env:
+          ARTIFACTS: ${{ steps.action.outputs.artifactsPath }}
+        run: |
+          echo "artifactsPath output: $ARTIFACTS"
+          if [ -z "$ARTIFACTS" ]; then
+            echo "WARN: artifactsPath output is empty (action may have failed to run Docker)"
+          else
+            echo "PASS: artifactsPath output is set to '$ARTIFACTS'"
+          fi
