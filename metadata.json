@@ -1,0 +1,7 @@
+{
+  "owner": "game-ci",
+  "name": "unity-test-runner",
+  "visibility": "internal",
+  "description": "Run tests for any Unity project.",
+  "block_publish": false
+}
