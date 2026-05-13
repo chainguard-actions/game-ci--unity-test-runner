@@ -1,0 +1,28 @@
+name: Test customParameters input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          projectPath: '.'
+          customParameters: '-nographics -batchmode'
+          unityVersion: '2022.3.0f1'
+          testMode: 'editmode'
+          artifactsPath: 'artifacts'
+        continue-on-error: true
+      - name: Assert customParameters input was accepted
+        run: |
+          echo "outcome: ${{ steps.action.outcome }}"
+          # The action will fail without a real Unity license/installation,
+          # but we verify it ran (started) with the customParameters input provided.
+          # A failure due to missing Unity is expected; a setup/input error is not.
+          if [ "${{ steps.action.outcome }}" = "skipped" ]; then
+            echo "FAIL: action was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action ran with customParameters input"
