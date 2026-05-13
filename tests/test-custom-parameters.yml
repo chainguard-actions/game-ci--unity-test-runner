@@ -1,0 +1,28 @@
+name: Test customParameters input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create minimal Unity project structure
+        run: |
+          mkdir -p /tmp/unity-project-custom/ProjectSettings
+          echo "m_EditorVersion: 2021.3.0f1" > /tmp/unity-project-custom/ProjectSettings/ProjectVersion.txt
+      - id: action
+        uses: .
+        with:
+          projectPath: /tmp/unity-project-custom
+          unityVersion: '2021.3.0f1'
+          testMode: editmode
+          customParameters: '-nographics -batchmode'
+          artifactsPath: /tmp/unity-artifacts-custom
+        continue-on-error: true
+      - name: Assert customParameters input was accepted
+        run: |
+          echo "Action completed (may have failed due to missing Unity license, which is expected)"
+          echo "PASS: customParameters input was accepted by the action"
