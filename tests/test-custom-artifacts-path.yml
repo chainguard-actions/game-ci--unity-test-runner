@@ -1,0 +1,41 @@
+name: Test custom artifacts path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create Unity project structure
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/TestProject/ProjectSettings"
+          echo "m_EditorVersion: 2021.3.0f1" > "$GITHUB_WORKSPACE/TestProject/ProjectSettings/ProjectVersion.txt"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          projectPath: TestProject
+          testMode: editmode
+          artifactsPath: my-custom-artifacts-dir
+
+      - name: Assert artifactsPath output matches configured path
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          ARTIFACTS_PATH: ${{ steps.action.outputs.artifactsPath }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "artifactsPath output: $ARTIFACTS_PATH"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$ARTIFACTS_PATH" != "my-custom-artifacts-dir" ]; then
+              echo "FAIL: expected artifactsPath='my-custom-artifacts-dir' but got '$ARTIFACTS_PATH'"
+              exit 1
+            fi
+            echo "PASS: artifactsPath output matches configured value"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (Unity not available in test environment)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

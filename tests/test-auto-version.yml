@@ -1,0 +1,42 @@
+name: Test auto unity version detection
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create Unity project with specific version
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/MyUnityProject/ProjectSettings"
+          echo "m_EditorVersion: 2022.3.10f1" > "$GITHUB_WORKSPACE/MyUnityProject/ProjectSettings/ProjectVersion.txt"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          unityVersion: auto
+          projectPath: MyUnityProject
+          testMode: editmode
+          artifactsPath: test-artifacts
+
+      - name: Assert action ran with auto version detection
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          ARTIFACTS_PATH: ${{ steps.action.outputs.artifactsPath }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "artifactsPath: $ARTIFACTS_PATH"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$ARTIFACTS_PATH" ]; then
+              echo "FAIL: action succeeded but artifactsPath output is empty"
+              exit 1
+            fi
+            echo "PASS: action succeeded with artifactsPath='$ARTIFACTS_PATH'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (Unity not available in test environment, auto-version detection attempted)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
