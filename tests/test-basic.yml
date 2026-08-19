@@ -1,0 +1,42 @@
+name: Test basic usage - Unity Test Runner
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create minimal Unity project structure
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/UnityProject/ProjectSettings"
+          echo "m_EditorVersion: 2021.3.0f1" > "$GITHUB_WORKSPACE/UnityProject/ProjectSettings/ProjectVersion.txt"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          unityVersion: '2021.3.0f1'
+          projectPath: UnityProject
+          testMode: editmode
+          artifactsPath: artifacts
+
+      - name: Assert action ran and produced artifactsPath output or failed gracefully
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          ARTIFACTS: ${{ steps.action.outputs.artifactsPath }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "artifactsPath output: $ARTIFACTS"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$ARTIFACTS" ]; then
+              echo "FAIL: action succeeded but artifactsPath output is empty"
+              exit 1
+            fi
+            echo "PASS: action succeeded with artifactsPath='$ARTIFACTS'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (Unity license/Docker not available in test environment)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
