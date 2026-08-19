@@ -8,7 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
-| v4.1.0 | [`v4.1.0`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.1.0) | — |
+| v4.1.0 | [`v4.1.0`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.1.0) | [`ce07478`](https://github.com/game-ci/unity-test-runner/commit/ce074787fbea6aec833f2c4a4c14315865e89047) |
 | v4.1.1 | [`v4.1.1`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.1.1) | — |
 | v4.2.0 | [`v4.2.0`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.2.0) | — |
 | v4.3.0 | [`v4.3.0`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.3.0) | — |
