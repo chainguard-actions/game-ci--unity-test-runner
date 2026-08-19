@@ -1,0 +1,776 @@
+name: Actions 😎
+on:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 18.x
+      - run: yarn
+      - run: yarn lint
+      - run: yarn test
+      - run: yarn build || { echo "build command should always succeed" ; exit 61; }
+  #      - run: yarn build --quiet && git diff --quiet action || { echo "ERROR - index.js is different from repository version. Forgot to run `yarn build`?" ; exit 62; }
+
+  testAllModesLikeInTheReadme:
+    name: Test in ${{ matrix.testMode }} of version ${{ matrix.unityVersion }} on ${{ matrix.baseRunner }}
+    runs-on: ${{ matrix.baseRunner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        baseRunner:
+          - ubuntu-latest
+          - windows-2022
+        projectPath:
+          - unity-project-with-correct-tests
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+        testMode:
+          - playmode
+          - editmode
+          - standalone
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      ###########################
+      #          Cache          #
+      ###########################
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.baseRunner }}-${{ matrix.projectPath }}
+          restore-keys: |
+            Library-${{ matrix.baseRunner }}
+      - uses: ./
+        id: tests
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: ${{ matrix.testMode }}
+          artifactsPath: ${{ matrix.testMode }}-artifacts
+          customParameters: -profile SomeProfile -someBoolean -someValue exampleValue
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Test results for ${{ matrix.testMode }} (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: ${{ steps.tests.outputs.artifactsPath }}
+          retention-days: 14
+
+  testRunnerInAllModes:
+    name: Test all modes ✨
+    runs-on: ${{ matrix.baseRunner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        baseRunner:
+          - ubuntu-latest
+          - windows-2022
+        projectPath:
+          - unity-project-with-correct-tests
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      ###########################
+      #          Cache          #
+      ###########################
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.baseRunner }}-${{ matrix.projectPath }}
+          restore-keys: |
+            Library-${{ matrix.baseRunner }}
+
+      # Configure test runner
+      - name: Run tests
+        id: allTests
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: all
+          coverageOptions: 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;assemblyFilters:+MyScripts;dontClear'
+          # Test implicit artifactsPath, by not setting it
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Test results (all) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: ${{ steps.allTests.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Coverage results (all) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: ${{ steps.allTests.outputs.coveragePath }}
+          retention-days: 14
+
+  testRunnerInEditMode:
+    name: Test edit mode 📝
+    runs-on: ${{ matrix.baseRunner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        baseRunner:
+          - ubuntu-latest
+          - windows-2022
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+        projectPath:
+          - unity-project-with-correct-tests
+        runAsHostUser:
+          - true
+          - false
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      ###########################
+      #          Cache          #
+      ###########################
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.baseRunner }}-${{ matrix.projectPath }}
+          restore-keys: |
+            Library-${{ matrix.baseRunner }}
+
+      # Configure test runner
+      - name: Run tests
+        id: editMode
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          runAsHostUser: ${{ matrix.runAsHostUser }}
+          testMode: editmode
+          artifactsPath: artifacts/editmode
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Test results (edit mode) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }}, ${{ matrix.runAsHostUser }})
+          path: ${{ steps.editMode.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Coverage results (edit mode) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }}, ${{ matrix.runAsHostUser }})
+          path: ${{ steps.editMode.outputs.coveragePath }}
+          retention-days: 14
+
+  testRunnerInPlayMode:
+    name: Test play mode 📺
+    runs-on: ${{ matrix.baseRunner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        baseRunner:
+          - ubuntu-latest
+          - windows-2022
+        projectPath:
+          - unity-project-with-correct-tests
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      ###########################
+      #          Cache          #
+      ###########################
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.baseRunner }}-${{ matrix.projectPath }}
+          restore-keys: |
+            Library-${{ matrix.baseRunner }}
+
+      # Configure test runner
+      - name: Run tests
+        id: playMode
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: playmode
+          artifactsPath: artifacts/playmode
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Test results (play mode) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: ${{ steps.playMode.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Coverage results (play mode) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: ${{ steps.playMode.outputs.coveragePath }}
+          retention-days: 14
+
+  testRunnerInStandalone:
+    name: Test standalone 📺
+    runs-on: ${{ matrix.baseRunner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        baseRunner:
+          - ubuntu-latest
+          - windows-2022
+        projectPath:
+          - unity-project-with-correct-tests
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      ###########################
+      #          Cache          #
+      ###########################
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.baseRunner }}-${{ matrix.projectPath }}
+          restore-keys: |
+            Library-${{ matrix.baseRunner }}-
+
+      # Configure test runner
+      - name: Run tests
+        id: standalone
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: standalone
+          artifactsPath: artifacts/standalone
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Test results (play mode standalone) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: ${{ steps.standalone.outputs.artifactsPath }}
+          retention-days: 14
+
+  testRunnerInStandaloneWithIL2CPP:
+    name: Test standalone with IL2CPP 📺
+    runs-on: ${{ matrix.baseRunner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        baseRunner:
+          - ubuntu-latest
+          - windows-2022
+        projectPath:
+          - unity-project-with-correct-tests
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      ###########################
+      #          Cache          #
+      ###########################
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.baseRunner }}-${{ matrix.projectPath }}
+          restore-keys: |
+            Library-${{ matrix.baseRunner }}-
+
+      # Set scripting backend to IL2CPP
+      - name: Rewrite ProjectSettings
+        env:
+          PROJECT_PATH: ${{ matrix.projectPath }}
+        run: |
+          DefineOriginal="  scriptingBackend: {}"
+          DefineReplace="  scriptingBackend: \\n    Standalone: 1"
+          sed -i "{s/$DefineOriginal/$DefineReplace/g}" "$PROJECT_PATH/ProjectSettings/ProjectSettings.asset"
+        shell: bash
+
+      # Configure test runner
+      - name: Run tests
+        id: standalone
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: standalone
+          artifactsPath: artifacts/standalone
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Test results (play mode standalone il2cpp) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: ${{ steps.standalone.outputs.artifactsPath }}
+          retention-days: 14
+
+  testEachModeSequentially:
+    name: Test each mode sequentially 👩‍👩‍👧‍👦 # don't try this at home (it's much slower)
+    runs-on: ${{ matrix.baseRunner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        baseRunner:
+          - ubuntu-latest
+          - windows-2022
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+        projectPath:
+          - unity-project-with-correct-tests
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      ###########################
+      #          Cache          #
+      ###########################
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ matrix.projectPath }}/Library
+          key: Library-${{ matrix.baseRunner }}-${{ matrix.projectPath }}
+          restore-keys: |
+            Library-${{ matrix.baseRunner }}-
+
+      # Configure first test runner
+      - name: Tests in editmode 📝
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: editmode
+          artifactsPath: artifacts/editmode
+
+      # Configure second test runner
+      - name: Tests in playmode 📺
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: playmode
+          artifactsPath: artifacts/playmode
+
+      # Configure third test runner
+      - name: Tests in standalone 📺
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: standalone
+          artifactsPath: artifacts/playmode
+
+      # Upload combined artifacts
+      - name: Upload combined test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Test results (combined sequential) (${{ matrix.baseRunner }}, ${{ matrix.unityVersion }})
+          path: artifacts/
+          retention-days: 14
+
+  testAllPackageModesLikeInTheReadme:
+    name: Test package mode 📦 in ${{ matrix.testMode }} on version ${{ matrix.unityVersion }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        projectPath:
+          - unity-package-with-correct-tests/com.example.testpackage
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+        testMode:
+          - playmode
+          - editmode
+
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      - uses: ./
+        id: packageTests
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: ${{ matrix.testMode }}
+          artifactsPath: ${{ matrix.testMode }}-packageArtifacts
+          customParameters: -profile SomeProfile -someBoolean -someValue exampleValue
+          packageMode: true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package test results for ${{ matrix.testMode }} (${{ matrix.unityVersion }})
+          path: ${{ steps.packageTests.outputs.artifactsPath }}
+          retention-days: 14
+
+  testPackageRunnerInAllModes:
+    name: Test package mode in all modes 📦✨
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        projectPath:
+          - unity-package-with-correct-tests/com.example.testpackage
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      # Configure test runner
+      - name: Run tests
+        id: packageAllTests
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: all
+          coverageOptions: 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;assemblyFilters:+example.testpackage.*,-*Tests*'
+          packageMode: true
+          # Test implicit artifactsPath, by not setting it
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package test results (all) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageAllTests.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package Coverage results (all) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageAllTests.outputs.coveragePath }}
+          retention-days: 14
+
+  testPackageRunnerInEditMode:
+    name: Test package mode in edit mode 📦📝
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+        projectPath:
+          - unity-package-with-correct-tests/com.example.testpackage
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      # Configure test runner
+      - name: Run tests
+        id: packageEditMode
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: editmode
+          coverageOptions: 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;assemblyFilters:+example.testpackage.*,-*Tests*'
+          artifactsPath: artifacts/packageeditmode
+          packageMode: true
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package test results (edit mode) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageEditMode.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package Coverage results (edit mode) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageEditMode.outputs.coveragePath }}
+          retention-days: 14
+
+  testPackageRunnerInPlayMode:
+    name: Test package mode in play mode 📦📺
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        projectPath:
+          - unity-package-with-correct-tests/com.example.testpackage
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      # Configure test runner
+      - name: Run tests
+        id: packagePlayMode
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: playmode
+          coverageOptions: 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;assemblyFilters:+example.testpackage.*,-*Tests*'
+          artifactsPath: artifacts/packageplaymode
+          packageMode: true
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package test results (play mode) (${{ matrix.unityVersion }})
+          path: ${{ steps.packagePlayMode.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package Coverage results (play mode) (${{ matrix.unityVersion }})
+          path: ${{ steps.packagePlayMode.outputs.coveragePath }}
+          retention-days: 14
+
+  testPackageModeEachModeSequentially:
+    name: Test package mode in each mode sequentially 📦 👩‍👩‍👧‍👦 # don't try this at home (it's much slower)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+        projectPath:
+          - unity-package-with-correct-tests/com.example.testpackage
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      # Configure first test runner
+      - name: Test package mode in editmode 📦📝
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: editmode
+          artifactsPath: packageArtifacts/editmode
+          packageMode: true
+
+      # Configure second test runner
+      - name: Test package mode in playmode 📦📺
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: playmode
+          artifactsPath: packageArtifacts/playmode
+          packageMode: true
+
+      # Upload combined artifacts
+      - name: Upload combined test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package test results (combined sequential) (${{ matrix.unityVersion }})
+          path: packageArtifacts/
+          retention-days: 14
+
+  testPackageRunnerWithScopeRegistry:
+    name: Test package mode in all modes with Scoped Registry 📦✨
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        projectPath:
+          - unity-package-with-correct-tests/com.dependencyexample.testpackage
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      # Configure test runner
+      - name: Run tests
+        id: packageAllTests
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: all
+          coverageOptions: 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;assemblyFilters:+dependencyexample.testpackage.*,-*Tests*'
+          packageMode: true
+          scopedRegistryUrl: https://package.openupm.com
+          registryScopes: 'com.cysharp.unitask'
+          # Test implicit artifactsPath, by not setting it
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package test results (Scope Registry) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageAllTests.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package Coverage results (Scope Registry) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageAllTests.outputs.coveragePath }}
+          retention-days: 14
+
+  testPackageRunnerWithScopeRegistryAndMultipleScopes:
+    name: Test package mode in all modes with Scoped Registry and Multiple Scopes 🔎📦✨
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        projectPath:
+          - unity-package-with-correct-tests/com.dependencyexample.testpackage
+        unityVersion:
+          - 2022.3.13f1
+          - 2023.1.19f1
+          - 2023.2.2f1
+    steps:
+      ###########################
+      #         Checkout        #
+      ###########################
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          lfs: true
+
+      # Configure test runner
+      - name: Run tests
+        id: packageAllTests
+        uses: ./
+        with:
+          projectPath: ${{ matrix.projectPath }}
+          unityVersion: ${{ matrix.unityVersion }}
+          testMode: all
+          coverageOptions: 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;assemblyFilters:+dependencyexample.testpackage.*,-*Tests*'
+          packageMode: true
+          scopedRegistryUrl: https://package.openupm.com
+          registryScopes: 'com.cysharp, com.cysharp.unitask'
+          # Test implicit artifactsPath, by not setting it
+
+      # Upload artifacts
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package test results (Multi Scope Regristy) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageAllTests.outputs.artifactsPath }}
+          retention-days: 14
+
+      # Upload coverage
+      - name: Upload coverage results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Package Coverage results (Multi Scope Registry) (${{ matrix.unityVersion }})
+          path: ${{ steps.packageAllTests.outputs.coveragePath }}
+          retention-days: 14

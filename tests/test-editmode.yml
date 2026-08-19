@@ -1,4 +1,4 @@
-name: Test basic usage (default inputs)
+name: Test EditMode test scenario
 on:
   workflow_dispatch:
 jobs:
@@ -12,10 +12,10 @@ jobs:
         continue-on-error: true
         with:
           unityVersion: '2022.3.0f1'
-          testMode: 'all'
-          artifactsPath: 'artifacts'
+          testMode: 'editmode'
+          artifactsPath: 'test-results/editmode'
 
-      - name: Assert action ran (outputs set or failed gracefully without Unity license)
+      - name: Assert action ran (EditMode) or failed gracefully without Unity
         env:
           OUTCOME: ${{ steps.action.outcome }}
           ARTIFACTS_PATH: ${{ steps.action.outputs.artifactsPath }}
