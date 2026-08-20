@@ -8,20 +8,27 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - id: action
         uses: .
-        with:
-          projectPath: '.'
-          unityVersion: '2022.3.0f1'
-          testMode: 'editmode'
-          artifactsPath: 'artifacts'
         continue-on-error: true
-      - name: Assert projectPath input was accepted
+        with:
+          projectPath: hardened/tests/fixtures/unity-project
+          unityVersion: '2022.3.0f1'
+          testMode: editmode
+      - name: Assert action ran with projectPath input
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          ARTIFACTS: ${{ steps.action.outputs.artifactsPath }}
         run: |
-          echo "outcome: ${{ steps.action.outcome }}"
-          # The action will fail without a real Unity license/installation,
-          # but we verify it ran (started) with the projectPath input provided.
-          # A failure due to missing Unity is expected; a setup/input error is not.
-          if [ "${{ steps.action.outcome }}" = "skipped" ]; then
-            echo "FAIL: action was skipped unexpectedly"
+          echo "outcome: $OUTCOME"
+          echo "artifactsPath: $ARTIFACTS"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$ARTIFACTS" ]; then
+              echo "FAIL: action succeeded but artifactsPath output is empty"
+              exit 1
+            fi
+            echo "PASS: action succeeded with artifactsPath='$ARTIFACTS'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (no Unity license or project available in CI)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
           fi
-          echo "PASS: action ran with projectPath input"
