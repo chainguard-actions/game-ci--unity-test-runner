@@ -1,4 +1,4 @@
-name: Test custom parameters
+name: Test auto unity version detection
 on:
   workflow_dispatch:
 jobs:
@@ -11,15 +11,11 @@ jobs:
         uses: .
         continue-on-error: true
         with:
-          unityVersion: '2022.3.0f1'
-          testMode: 'playmode'
-          artifactsPath: 'test-results'
-          customParameters: '-nographics'
-          coverageOptions: 'generateAdditionalMetrics;generateHtmlReport;generateBadgeReport;dontClear'
-          dockerCpuLimit: '2'
-          dockerMemoryLimit: '4g'
+          unityVersion: 'auto'
+          testMode: 'all'
+          artifactsPath: 'artifacts'
 
-      - name: Assert action ran with custom parameters
+      - name: Assert action ran with auto version detection
         env:
           OUTCOME: ${{ steps.action.outcome }}
           ARTIFACTS_PATH: ${{ steps.action.outputs.artifactsPath }}
@@ -31,9 +27,9 @@ jobs:
               echo "FAIL: action succeeded but artifactsPath output is empty"
               exit 1
             fi
-            echo "PASS: action succeeded with artifactsPath='$ARTIFACTS_PATH'"
+            echo "PASS: action succeeded with auto version detection, artifactsPath='$ARTIFACTS_PATH'"
           elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (expected without Unity license/project)"
+            echo "PASS: action failed gracefully (expected without ProjectVersion.txt or Unity license)"
           else
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1

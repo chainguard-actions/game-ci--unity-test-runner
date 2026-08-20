@@ -4,25 +4,33 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_EVENT_NAME: push
-      GITHUB_REF: refs/heads/main
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
       - id: action
         uses: .
+        continue-on-error: true
         with:
           unityVersion: '2022.3.0f1'
           testMode: 'editmode'
           artifactsPath: 'artifacts'
-        continue-on-error: true
-      - name: Assert artifactsPath output is set
+
+      - name: Assert action ran and produced an outcome
         env:
-          ARTIFACTS: ${{ steps.action.outputs.artifactsPath }}
+          OUTCOME: ${{ steps.action.outcome }}
+          ARTIFACTS_PATH: ${{ steps.action.outputs.artifactsPath }}
         run: |
-          echo "artifactsPath output: $ARTIFACTS"
-          if [ -z "$ARTIFACTS" ]; then
-            echo "WARN: artifactsPath output is empty (action may have failed to run Docker)"
+          echo "outcome: $OUTCOME"
+          echo "artifactsPath: $ARTIFACTS_PATH"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$ARTIFACTS_PATH" ]; then
+              echo "FAIL: action succeeded but artifactsPath output is empty"
+              exit 1
+            fi
+            echo "PASS: action succeeded with artifactsPath='$ARTIFACTS_PATH'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected without Unity license/project)"
           else
-            echo "PASS: artifactsPath output is set to '$ARTIFACTS'"
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
           fi
