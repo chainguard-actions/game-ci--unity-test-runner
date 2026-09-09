@@ -1,0 +1,30 @@
+name: Test invalid testMode fails gracefully
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # When an invalid testMode is provided, the action must fail.
+      # Valid modes are: all, playmode, editmode, standalone.
+      # The validation happens in testCliArgs() and throws an Error.
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          unityVersion: '2022.3.0f1'
+          testMode: 'invalidmode'
+          coverageEnabled: 'false'
+
+      - name: Assert action failed due to invalid testMode
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail with invalid testMode='invalidmode', but got outcome='$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly failed with invalid testMode"
