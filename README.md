@@ -13,6 +13,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v4.2.0 | [`v4.2.0`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.2.0) | [`5817131`](https://github.com/game-ci/unity-test-runner/commit/5817131b76378ee08ad4cde3067af92d7c66f864) |
 | v4.3.0 | [`v4.3.0`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.3.0) | [`eba7e93`](https://github.com/game-ci/unity-test-runner/commit/eba7e93e664e4d4fc605a973c8a928f6ce1de2a9) |
 | v4.3.1 | [`v4.3.1`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.3.1) | [`0ff419b`](https://github.com/game-ci/unity-test-runner/commit/0ff419b913a3630032cbe0de48a0099b5a9f0ed9) |
+| v4.4.0 | [`v4.4.0`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v4.4.0) | [`32e5771`](https://github.com/game-ci/unity-test-runner/commit/32e57712352b500e17974b245a6dce9e11a73213) |
 | v5.0.0-beta.1 | [`v5.0.0-beta.1`](https://github.com/chainguard-actions/game-ci-unity-test-runner/tree/v5.0.0-beta.1) | [`f7d28f8`](https://github.com/game-ci/unity-test-runner/commit/f7d28f891263d875d47ef34370e9e8dd6087e1ef) |
 
 ## Privacy
